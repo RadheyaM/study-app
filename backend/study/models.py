@@ -2,18 +2,22 @@ from django.db import models
 
 class Book(models.Model):
     title = models.CharField(max_length=255)
+    title_devanagari = models.CharField(max_length=255, blank=True, null=True)
+    title_iast = models.CharField(max_length=255, blank=True, null=True)
     author = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.title
+        return self.title_iast if self.title_iast else self.title
 
 
 class StudySection(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='sections')
     title = models.CharField(max_length=255)
+    title_devanagari = models.CharField(max_length=255, blank=True, null=True)
+    title_iast = models.CharField(max_length=255, blank=True, null=True)
     parent = models.ForeignKey(
         'self',
         on_delete=models.CASCADE,

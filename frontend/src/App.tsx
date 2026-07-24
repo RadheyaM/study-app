@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   BookOpen, Plus, FolderPlus, FileText, Search, Book as BookIcon, 
-  Trash2, X 
+  Trash2, Edit, X 
 } from 'lucide-react';
 import { hkToDevanagari, hkToIast } from './sanscript';
 import './index.css';
@@ -11,13 +11,17 @@ const API_BASE = 'http://localhost:8000/api';
 interface Book {
   id: number;
   title: string;
-  author?: string;
-  description?: string;
+  title_devanagari?: string | null;
+  title_iast?: string | null;
+  author?: string | null;
+  description?: string | null;
 }
 
 interface Section {
   id: number;
   title: string;
+  title_devanagari?: string | null;
+  title_iast?: string | null;
   book: number;
   parent?: number | null;
   subsections?: Section[];
@@ -52,6 +56,20 @@ interface Term {
   notes: number[];
 }
 
+const getBookTitleDisplay = (book: Book | null): string => {
+  if (!book) return '';
+  if (book.title_iast) return book.title_iast;
+  if (book.title_devanagari) return book.title_devanagari;
+  return book.title;
+};
+
+const getSectionTitleDisplay = (sec: Section | null): string => {
+  if (!sec) return '';
+  if (sec.title_iast) return sec.title_iast;
+  if (sec.title_devanagari) return sec.title_devanagari;
+  return sec.title;
+};
+
 export default function App() {
   // Navigation & Data States
   const [books, setBooks] = useState<Book[]>([]);
@@ -78,14 +96,53 @@ export default function App() {
   const [hkHelperIast, setHkHelperIast] = useState('');
 
   // New Record Form States
-  const [newBook, setNewBook] = useState({ title: '', author: '', description: '' });
-  const [newSection, setNewSection] = useState({ title: '', parent: '' as string | number });
+  const [newBook, setNewBook] = useState({ title: '', title_devanagari: '', title_iast: '', author: '', description: '' });
+  const [newSection, setNewSection] = useState({ title: '', title_devanagari: '', title_iast: '', parent: '' as string | number });
   const [newSutra, setNewSutra] = useState({ devanagari_text: '', transliteration_text: '', english_translation: '', order: 0 });
   const [newNote, setNewNote] = useState({ 
     title: '', content: '', 
     ref_sutra_devanagari: '', ref_sutra_transliteration: '', ref_sutra_translation: '' 
   });
   const [newTerm, setNewTerm] = useState({ sanskrit_term_devanagari: '', sanskrit_term_iast: '', definition: '' });
+
+  // Edit Section States
+  const [editingSection, setEditingSection] = useState<Section | null>(null);
+  const [showEditSectionModal, setShowEditSectionModal] = useState(false);
+  const [editSectionTitle, setEditSectionTitle] = useState('');
+  const [editSectionTitleDev, setEditSectionTitleDev] = useState('');
+  const [editSectionTitleIast, setEditSectionTitleIast] = useState('');
+  const [editSectionParent, setEditSectionParent] = useState<string | number>('');
+
+  // Edit Book States
+  const [showEditBookModal, setShowEditBookModal] = useState(false);
+  const [editBookTitle, setEditBookTitle] = useState('');
+  const [editBookTitleDev, setEditBookTitleDev] = useState('');
+  const [editBookTitleIast, setEditBookTitleIast] = useState('');
+  const [editBookAuthor, setEditBookAuthor] = useState('');
+  const [editBookDescription, setEditBookDescription] = useState('');
+
+  // Edit Sutra States
+  const [editingSutra, setEditingSutra] = useState<Sutra | null>(null);
+  const [showEditSutraModal, setShowEditSutraModal] = useState(false);
+  const [editSutraDevanagari, setEditSutraDevanagari] = useState('');
+  const [editSutraTransliteration, setEditSutraTransliteration] = useState('');
+  const [editSutraTranslation, setEditSutraTranslation] = useState('');
+  const [editSutraOrder, setEditSutraOrder] = useState<number>(0);
+
+  // Helper to flatten the section tree
+  const getFlatSections = (sectionsList: Section[]): Section[] => {
+    const flat: Section[] = [];
+    const traverse = (list: Section[]) => {
+      for (const s of list) {
+        flat.push(s);
+        if (s.subsections && s.subsections.length > 0) {
+          traverse(s.subsections);
+        }
+      }
+    };
+    traverse(sectionsList);
+    return flat;
+  };
 
   // Load Initial Data
   useEffect(() => {
@@ -199,16 +256,58 @@ export default function App() {
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        title: newBook.title || newBook.title_iast || newBook.title_devanagari,
+        title_devanagari: newBook.title_devanagari,
+        title_iast: newBook.title_iast,
+        author: newBook.author,
+        description: newBook.description
+      };
       const res = await fetch(`${API_BASE}/books/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newBook)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       setBooks([...books, data]);
       setActiveBook(data);
       setShowBookModal(false);
-      setNewBook({ title: '', author: '', description: '' });
+      setNewBook({ title: '', title_devanagari: '', title_iast: '', author: '', description: '' });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleEditBookClick = () => {
+    if (!activeBook) return;
+    setEditBookTitle(activeBook.title);
+    setEditBookTitleDev(activeBook.title_devanagari || '');
+    setEditBookTitleIast(activeBook.title_iast || '');
+    setEditBookAuthor(activeBook.author || '');
+    setEditBookDescription(activeBook.description || '');
+    setShowEditBookModal(true);
+  };
+
+  const handleEditBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeBook) return;
+    try {
+      const payload = {
+        title: editBookTitle || editBookTitleIast || editBookTitleDev,
+        title_devanagari: editBookTitleDev,
+        title_iast: editBookTitleIast,
+        author: editBookAuthor,
+        description: editBookDescription
+      };
+      const res = await fetch(`${API_BASE}/books/${activeBook.id}/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setBooks(books.map(b => b.id === activeBook.id ? data : b));
+      setActiveBook(data);
+      setShowEditBookModal(false);
     } catch (e) {
       console.error(e);
     }
@@ -219,7 +318,9 @@ export default function App() {
     if (!activeBook) return;
     try {
       const payload = {
-        title: newSection.title,
+        title: newSection.title || newSection.title_iast || newSection.title_devanagari,
+        title_devanagari: newSection.title_devanagari,
+        title_iast: newSection.title_iast,
         book: activeBook.id,
         parent: newSection.parent ? Number(newSection.parent) : null
       };
@@ -230,7 +331,64 @@ export default function App() {
       });
       fetchSectionTree(activeBook.id);
       setShowSectionModal(false);
-      setNewSection({ title: '', parent: '' });
+      setNewSection({ title: '', title_devanagari: '', title_iast: '', parent: '' });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleEditSectionClick = (section: Section) => {
+    setEditingSection(section);
+    setEditSectionTitle(section.title);
+    setEditSectionTitleDev(section.title_devanagari || '');
+    setEditSectionTitleIast(section.title_iast || '');
+    setEditSectionParent(section.parent || '');
+    setShowEditSectionModal(true);
+  };
+
+  const handleEditSection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSection || !activeBook) return;
+    try {
+      const payload = {
+        title: editSectionTitle || editSectionTitleIast || editSectionTitleDev,
+        title_devanagari: editSectionTitleDev,
+        title_iast: editSectionTitleIast,
+        book: activeBook.id,
+        parent: editSectionParent ? Number(editSectionParent) : null
+      };
+      await fetch(`${API_BASE}/sections/${editingSection.id}/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      fetchSectionTree(activeBook.id);
+      setShowEditSectionModal(false);
+      setEditingSection(null);
+      if (activeSection?.id === editingSection.id) {
+        setActiveSection({ 
+          ...activeSection, 
+          title: payload.title,
+          title_devanagari: editSectionTitleDev,
+          title_iast: editSectionTitleIast,
+          parent: editSectionParent ? Number(editSectionParent) : null 
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteSection = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this section? This will delete all its subsections, sutras, and notes!")) return;
+    try {
+      await fetch(`${API_BASE}/sections/${id}/`, { method: 'DELETE' });
+      if (activeBook) {
+        fetchSectionTree(activeBook.id);
+      }
+      if (activeSection?.id === id) {
+        setActiveSection(null);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -254,6 +412,42 @@ export default function App() {
       if (!activeSutra) setActiveSutra(data);
       setShowSutraModal(false);
       setNewSutra({ devanagari_text: '', transliteration_text: '', english_translation: '', order: sutras.length + 1 });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleEditSutraClick = () => {
+    if (!activeSutra) return;
+    setEditingSutra(activeSutra);
+    setEditSutraDevanagari(activeSutra.devanagari_text);
+    setEditSutraTransliteration(activeSutra.transliteration_text || '');
+    setEditSutraTranslation(activeSutra.english_translation || '');
+    setEditSutraOrder(activeSutra.order || 0);
+    setShowEditSutraModal(true);
+  };
+
+  const handleEditSutra = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSutra || !activeSection) return;
+    try {
+      const payload = {
+        section: activeSection.id,
+        devanagari_text: editSutraDevanagari,
+        transliteration_text: editSutraTransliteration,
+        english_translation: editSutraTranslation,
+        order: editSutraOrder
+      };
+      const res = await fetch(`${API_BASE}/sutras/${editingSutra.id}/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setSutras(sutras.map(s => s.id === editingSutra.id ? data : s));
+      setActiveSutra(data);
+      setShowEditSutraModal(false);
+      setEditingSutra(null);
     } catch (e) {
       console.error(e);
     }
@@ -331,13 +525,37 @@ export default function App() {
   const renderSectionTree = (sectionsList: Section[], depth = 0) => {
     return sectionsList.map((sec) => (
       <div key={sec.id} style={{ marginLeft: `${depth * 12}px` }} className="section-tree-item">
-        <button 
-          onClick={() => setActiveSection(sec)}
-          className={`sidebar-section-btn ${activeSection?.id === sec.id ? 'active' : ''}`}
-        >
-          <FolderPlus size={16} className="icon-sep" />
-          <span className="section-title-txt">{sec.title}</span>
-        </button>
+        <div className={`section-item-row ${activeSection?.id === sec.id ? 'active' : ''}`}>
+          <button 
+            onClick={() => setActiveSection(sec)}
+            className="sidebar-section-btn"
+          >
+            <FolderPlus size={16} className="icon-sep" />
+            <span className="section-title-txt">{getSectionTitleDisplay(sec)}</span>
+          </button>
+          <div className="section-item-actions">
+            <button 
+              className="action-icon-btn" 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditSectionClick(sec);
+              }}
+              title="Rename / Move Section"
+            >
+              <Edit size={14} />
+            </button>
+            <button 
+              className="action-icon-btn delete-action" 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteSection(sec.id);
+              }}
+              title="Delete Section"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
         {sec.subsections && sec.subsections.length > 0 && (
           <div className="nested-sections-container">
             {renderSectionTree(sec.subsections, depth + 1)}
@@ -377,9 +595,14 @@ export default function App() {
             >
               <option value="" disabled>Select Work...</option>
               {books.map(b => (
-                <option key={b.id} value={b.id}>{b.title}</option>
+                <option key={b.id} value={b.id}>{getBookTitleDisplay(b)}</option>
               ))}
             </select>
+            {activeBook && (
+              <button className="add-btn-small" style={{ backgroundColor: 'var(--text-secondary)', marginRight: '4px' }} onClick={handleEditBookClick} title="Rename / Edit Book">
+                <Edit size={16} />
+              </button>
+            )}
             <button className="add-btn-small" onClick={() => setShowBookModal(true)} title="Add New Book">
               <Plus size={16} />
             </button>
@@ -445,7 +668,7 @@ export default function App() {
               
               {/* Section Header */}
               <div className="section-main-heading">
-                <h2>{activeSection.title}</h2>
+                <h2>{getSectionTitleDisplay(activeSection)}</h2>
                 <button className="add-sutra-btn" onClick={() => setShowSutraModal(true)}>
                   <Plus size={16} className="icon-sep" />
                   Add Sutra
@@ -475,9 +698,14 @@ export default function App() {
                   <div className="sutra-primary-display">
                     <div className="sutra-display-header">
                       <span className="sutra-number-badge">Sūtra #{sutras.indexOf(activeSutra) + 1}</span>
-                      <button className="delete-icon-btn" onClick={() => handleDeleteSutra(activeSutra.id)}>
-                        <Trash2 size={16} />
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="delete-icon-btn" style={{ color: 'var(--text-secondary)' }} onClick={handleEditSutraClick} title="Edit Sutra">
+                          <Edit size={16} />
+                        </button>
+                        <button className="delete-icon-btn" onClick={() => handleDeleteSutra(activeSutra.id)} title="Delete Sutra">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="sutra-content-layers">
@@ -639,12 +867,39 @@ export default function App() {
             </div>
             <form onSubmit={handleAddBook} className="modal-form">
               <div className="form-group">
-                <label>Title of Work *</label>
+                <label>Harvard-Kyoto Typing Assistant (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="Type title in HK: e.g. yoga sUtrANi..." 
+                  className="assistant-input"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewBook({
+                      ...newBook,
+                      title: val,
+                      title_devanagari: hkToDevanagari(val),
+                      title_iast: hkToIast(val)
+                    });
+                  }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Title (Default / IAST) *</label>
                 <input 
                   type="text" required
-                  placeholder="e.g. Yoga Sutras, Ashtadhyayi..." 
-                  value={newBook.title}
-                  onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
+                  placeholder="e.g. Yoga Sutras, yoga-sūtrāṇi..." 
+                  value={newBook.title_iast || newBook.title}
+                  onChange={(e) => setNewBook({ ...newBook, title: e.target.value, title_iast: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Title in Devanāgarī (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. योगसूत्राणि" 
+                  value={newBook.title_devanagari}
+                  onChange={(e) => setNewBook({ ...newBook, title_devanagari: e.target.value })}
+                  className="devanagari-font"
                 />
               </div>
               <div className="form-group">
@@ -674,6 +929,78 @@ export default function App() {
         </div>
       )}
 
+      {/* 1B. EDIT BOOK MODAL */}
+      {showEditBookModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h2>Edit Study Work / Book</h2>
+              <button className="close-btn" onClick={() => setShowEditBookModal(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleEditBook} className="modal-form">
+              <div className="form-group">
+                <label>Harvard-Kyoto Typing Assistant (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="Type title in HK to rename..." 
+                  className="assistant-input"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditBookTitle(val);
+                    setEditBookTitleDev(hkToDevanagari(val));
+                    setEditBookTitleIast(hkToIast(val));
+                  }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Title (Default / IAST) *</label>
+                <input 
+                  type="text" required
+                  placeholder="e.g. Yoga Sutras, yoga-sūtrāṇi..." 
+                  value={editBookTitleIast || editBookTitle}
+                  onChange={(e) => {
+                    setEditBookTitle(e.target.value);
+                    setEditBookTitleIast(e.target.value);
+                  }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Title in Devanāgarī (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. योगसूत्राणि" 
+                  value={editBookTitleDev}
+                  onChange={(e) => setEditBookTitleDev(e.target.value)}
+                  className="devanagari-font"
+                />
+              </div>
+              <div className="form-group">
+                <label>Author / Commentator</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Patanjali, Vyasa..." 
+                  value={editBookAuthor}
+                  onChange={(e) => setEditBookAuthor(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Description</label>
+                <textarea 
+                  rows={3} 
+                  placeholder="Notes about the edition, commentaries studied, etc."
+                  value={editBookDescription}
+                  onChange={(e) => setEditBookDescription(e.target.value)}
+                />
+              </div>
+              <div className="form-actions">
+                <button type="button" className="btn-sec" onClick={() => setShowEditBookModal(false)}>Cancel</button>
+                <button type="submit" className="btn-pri">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* 2. SECTION MODAL */}
       {showSectionModal && (
         <div className="modal-backdrop">
@@ -684,12 +1011,39 @@ export default function App() {
             </div>
             <form onSubmit={handleAddSection} className="modal-form">
               <div className="form-group">
-                <label>Section Title *</label>
+                <label>Harvard-Kyoto Typing Assistant (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="Type section title in HK: e.g. samAdhipAdaH..." 
+                  className="assistant-input"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewSection({
+                      ...newSection,
+                      title: val,
+                      title_devanagari: hkToDevanagari(val),
+                      title_iast: hkToIast(val)
+                    });
+                  }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Section Title (Default / IAST) *</label>
                 <input 
                   type="text" required
                   placeholder="e.g. Samadhi Pada, Chapter 1..." 
-                  value={newSection.title}
-                  onChange={(e) => setNewSection({ ...newSection, title: e.target.value })}
+                  value={newSection.title_iast || newSection.title}
+                  onChange={(e) => setNewSection({ ...newSection, title: e.target.value, title_iast: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Title in Devanāgarī (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. समाधिपादः" 
+                  value={newSection.title_devanagari}
+                  onChange={(e) => setNewSection({ ...newSection, title_devanagari: e.target.value })}
+                  className="devanagari-font"
                 />
               </div>
               <div className="form-group">
@@ -699,14 +1053,82 @@ export default function App() {
                   onChange={(e) => setNewSection({ ...newSection, parent: e.target.value })}
                 >
                   <option value="">None (Top-Level)</option>
-                  {sections.map(s => (
-                    <option key={s.id} value={s.id}>{s.title}</option>
+                  {getFlatSections(sections).map(s => (
+                    <option key={s.id} value={s.id}>{getSectionTitleDisplay(s)}</option>
                   ))}
                 </select>
               </div>
               <div className="form-actions">
                 <button type="button" className="btn-sec" onClick={() => setShowSectionModal(false)}>Cancel</button>
                 <button type="submit" className="btn-pri">Create Section</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2B. EDIT SECTION MODAL */}
+      {showEditSectionModal && editingSection && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h2>Edit Study Section</h2>
+              <button className="close-btn" onClick={() => { setShowEditSectionModal(false); setEditingSection(null); }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleEditSection} className="modal-form">
+              <div className="form-group">
+                <label>Harvard-Kyoto Typing Assistant (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="Type title in HK to rename..." 
+                  className="assistant-input"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditSectionTitle(val);
+                    setEditSectionTitleDev(hkToDevanagari(val));
+                    setEditSectionTitleIast(hkToIast(val));
+                  }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Section Title (Default / IAST) *</label>
+                <input 
+                  type="text" required
+                  placeholder="e.g. Samadhi Pada, Chapter 1..." 
+                  value={editSectionTitleIast || editSectionTitle}
+                  onChange={(e) => {
+                    setEditSectionTitle(e.target.value);
+                    setEditSectionTitleIast(e.target.value);
+                  }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Title in Devanāgarī (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. समाधिपादः" 
+                  value={editSectionTitleDev}
+                  onChange={(e) => setEditSectionTitleDev(e.target.value)}
+                  className="devanagari-font"
+                />
+              </div>
+              <div className="form-group">
+                <label>Parent Section (Optional - for nested subsections)</label>
+                <select 
+                  value={editSectionParent}
+                  onChange={(e) => setEditSectionParent(e.target.value)}
+                >
+                  <option value="">None (Top-Level)</option>
+                  {getFlatSections(sections)
+                    .filter(s => s.id !== editingSection.id)
+                    .map(s => (
+                      <option key={s.id} value={s.id}>{getSectionTitleDisplay(s)}</option>
+                    ))}
+                </select>
+              </div>
+              <div className="form-actions">
+                <button type="button" className="btn-sec" onClick={() => { setShowEditSectionModal(false); setEditingSection(null); }}>Cancel</button>
+                <button type="submit" className="btn-pri">Save Changes</button>
               </div>
             </form>
           </div>
@@ -723,77 +1145,121 @@ export default function App() {
             </div>
             <form onSubmit={handleAddSutra} className="modal-form">
               
-              <div className="split-form-grid">
-                {/* Inputs Pane */}
-                <div className="inputs-pane">
-                  <div className="form-group">
-                    <label>Devanāgarī Script *</label>
-                    <textarea 
-                      rows={3} required
-                      placeholder="अथ योगानुशासनम्" 
-                      value={newSutra.devanagari_text}
-                      onChange={(e) => setNewSutra({ ...newSutra, devanagari_text: e.target.value })}
-                    />
-                  </div>
+              <div className="form-group">
+                <label>Harvard-Kyoto Typing Assistant (Optional - supports multi-line)</label>
+                <textarea 
+                  rows={4}
+                  placeholder="Type in HK format here to instantly auto-populate Devanāgarī and IAST below: e.g. atha yogAnuSAsanam..." 
+                  className="assistant-input"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewSutra({
+                      ...newSutra,
+                      devanagari_text: hkToDevanagari(val),
+                      transliteration_text: hkToIast(val)
+                    });
+                  }}
+                />
+              </div>
 
-                  <div className="form-group">
-                    <label>IAST Diacritics Transliteration</label>
-                    <textarea 
-                      rows={2}
-                      placeholder="atha yogānuśāsanam" 
-                      value={newSutra.transliteration_text}
-                      onChange={(e) => setNewSutra({ ...newSutra, transliteration_text: e.target.value })}
-                    />
-                  </div>
+              <div className="form-group">
+                <label>Devanāgarī Script *</label>
+                <textarea 
+                  rows={3} required
+                  placeholder="अथ योगानुशासनम्" 
+                  value={newSutra.devanagari_text}
+                  onChange={(e) => setNewSutra({ ...newSutra, devanagari_text: e.target.value })}
+                  className="devanagari-font"
+                />
+              </div>
 
-                  <div className="form-group">
-                    <label>English Translation</label>
-                    <textarea 
-                      rows={3}
-                      placeholder="Now begins the instruction on Yoga." 
-                      value={newSutra.english_translation}
-                      onChange={(e) => setNewSutra({ ...newSutra, english_translation: e.target.value })}
-                    />
-                  </div>
-                </div>
+              <div className="form-group">
+                <label>IAST Diacritics Transliteration</label>
+                <textarea 
+                  rows={3}
+                  placeholder="atha yogānuśāsanam" 
+                  value={newSutra.transliteration_text}
+                  onChange={(e) => setNewSutra({ ...newSutra, transliteration_text: e.target.value })}
+                />
+              </div>
 
-                {/* HK Transliterating Assistant Panel */}
-                <div className="hk-assistant-panel">
-                  <h4>💡 Transliteration Assistant</h4>
-                  <p className="assistant-hint">Type in Harvard-Kyoto (HK) format here to instantly generate Devanāgarī and IAST diacritics to copy & paste into your form!</p>
-                  
-                  <input 
-                    type="text" 
-                    placeholder="Type HK: e.g. yoga, puruSa, Izvara..." 
-                    className="assistant-input"
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const dev = hkToDevanagari(val);
-                      const iast = hkToIast(val);
-                      setNewSutra({
-                        ...newSutra,
-                        devanagari_text: dev,
-                        transliteration_text: iast
-                      });
-                    }}
-                  />
-
-                  <div className="assistant-outputs">
-                    <div className="out-block">
-                      <span className="out-lbl">Auto-generated Devanāgarī:</span>
-                      <div className="out-val devanagari-font">{newSutra.devanagari_text || '(Instantly converted)'}</div>
-                    </div>
-                    <div className="out-block">
-                      <span className="out-lbl">Auto-generated IAST:</span>
-                      <div className="out-val">{newSutra.transliteration_text || '(Instantly converted)'}</div>
-                    </div>
-                  </div>
-                </div>
+              <div className="form-group">
+                <label>English Translation</label>
+                <textarea 
+                  rows={4}
+                  placeholder="Now begins the instruction on Yoga." 
+                  value={newSutra.english_translation}
+                  onChange={(e) => setNewSutra({ ...newSutra, english_translation: e.target.value })}
+                />
               </div>
 
               <div className="form-actions">
                 <button type="button" className="btn-sec" onClick={() => setShowSutraModal(false)}>Cancel</button>
                 <button type="submit" className="btn-pri">Save Sūtra</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3B. EDIT SUTRA MODAL */}
+      {showEditSutraModal && editingSutra && (
+        <div className="modal-backdrop">
+          <div className="modal-card modal-card-large">
+            <div className="modal-header">
+              <h2>Edit Sūtra</h2>
+              <button className="close-btn" onClick={() => { setShowEditSutraModal(false); setEditingSutra(null); }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleEditSutra} className="modal-form">
+              
+              <div className="form-group">
+                <label>Harvard-Kyoto Typing Assistant (Optional - supports multi-line)</label>
+                <textarea 
+                  rows={4}
+                  placeholder="Type in HK format here to instantly auto-populate Devanāgarī and IAST below: e.g. atha yogAnuSAsanam..." 
+                  className="assistant-input"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditSutraDevanagari(hkToDevanagari(val));
+                    setEditSutraTransliteration(hkToIast(val));
+                  }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Devanāgarī Script *</label>
+                <textarea 
+                  rows={3} required
+                  placeholder="अथ योगानुशासनम्" 
+                  value={editSutraDevanagari}
+                  onChange={(e) => setEditSutraDevanagari(e.target.value)}
+                  className="devanagari-font"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>IAST Diacritics Transliteration</label>
+                <textarea 
+                  rows={3}
+                  placeholder="atha yogānuśāsanam" 
+                  value={editSutraTransliteration}
+                  onChange={(e) => setEditSutraTransliteration(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>English Translation</label>
+                <textarea 
+                  rows={4}
+                  placeholder="Now begins the instruction on Yoga." 
+                  value={editSutraTranslation}
+                  onChange={(e) => setEditSutraTranslation(e.target.value)}
+                />
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn-sec" onClick={() => { setShowEditSutraModal(false); setEditingSutra(null); }}>Cancel</button>
+                <button type="submit" className="btn-pri">Save Changes</button>
               </div>
             </form>
           </div>

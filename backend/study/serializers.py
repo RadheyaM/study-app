@@ -17,7 +17,7 @@ class StudySectionTreeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudySection
-        fields = ['id', 'title', 'book', 'parent', 'order', 'subsections']
+        fields = ['id', 'title', 'title_devanagari', 'title_iast', 'book', 'parent', 'order', 'subsections']
 
     def get_subsections(self, obj):
         children = obj.subsections.all()
