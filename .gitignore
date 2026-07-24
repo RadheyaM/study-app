@@ -1,0 +1,39 @@
+# --- Node / React / Frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.eslintcache
+
+# --- Python / Django / Backend ---
+**/__pycache__/
+backend/__pycache__/
+backend/study/__pycache__/
+backend/study/migrations/__pycache__/
+backend/sanskrit_study_app/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+ENV/
+env/
+*.sqlite3
+db.sqlite3
+
+# --- Environment Secrets ---
+.env
+.env.local
+.env.*.local
+
+# --- IDEs & OS Specific ---
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
