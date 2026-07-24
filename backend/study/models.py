@@ -37,6 +37,8 @@ class StudySection(models.Model):
 
 class Sutra(models.Model):
     section = models.ForeignKey(StudySection, on_delete=models.CASCADE, related_name='sutras')
+    item_label = models.CharField(max_length=100, default='Sūtra')
+    item_number = models.CharField(max_length=50, blank=True, default='')
     devanagari_text = models.TextField()
     transliteration_text = models.TextField(blank=True, null=True)  # IAST
     english_translation = models.TextField(blank=True, null=True)

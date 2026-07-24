@@ -3,7 +3,10 @@ import {
   BookOpen, Plus, FolderPlus, FileText, Search, Book as BookIcon, 
   Trash2, Edit, X 
 } from 'lucide-react';
-import { hkToDevanagari, hkToIast } from './sanscript';
+import { hkToDevanagari, hkToIast, iastToHk } from './sanscript';
+import { defaultProps, defaultBlockSpecs } from "@blocknote/core";
+import { BlockNoteView, useBlockNote, createReactBlockSpec } from "@blocknote/react";
+import "@blocknote/react/style.css";
 import './index.css';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -30,6 +33,8 @@ interface Section {
 interface Sutra {
   id: number;
   section: number;
+  item_label: string;
+  item_number: string;
   devanagari_text: string;
   transliteration_text?: string;
   english_translation?: string;
@@ -56,6 +61,197 @@ interface Term {
   notes: number[];
 }
 
+// Custom Sutra Box Block for BlockNote
+export const SutraBoxBlock = createReactBlockSpec(
+  {
+    type: "sutraBox",
+    propSchema: {
+      ...defaultProps,
+      bookName: { default: "" },
+      sutraLabel: { default: "Sūtra" },
+      sutraNumber: { default: "" },
+      devanagari: { default: "" },
+      translation: { default: "" }
+    },
+    content: "none"
+  },
+  {
+    render: (props: any) => {
+      const updateProp = (field: string, val: string) => {
+        props.editor.updateBlock(props.block, {
+          type: "sutraBox",
+          props: {
+            ...props.block.props,
+            [field]: val
+          }
+        });
+      };
+
+      const isEditable = props.editor.isEditable;
+
+      return (
+        <div className="embedded-reference-sutra" style={{ border: '2px solid var(--accent-color)', padding: '16px', borderRadius: '8px', margin: '12px 0', backgroundColor: 'var(--bg-secondary)', width: '100%', boxSizing: 'border-box' }}>
+          <span className="ref-badge" style={{ backgroundColor: 'var(--accent-color)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 'bold' }}>Embedded Sutra Card</span>
+          
+          {isEditable ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginTop: '12px' }}>
+              <div style={{ margin: 0 }}>
+                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Book Name</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Yoga Sūtras" 
+                  value={props.block.props.bookName} 
+                  onChange={(e) => updateProp('bookName', e.target.value)}
+                  style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ margin: 0 }}>
+                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Item Label</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Verse, Sūtra" 
+                  value={props.block.props.sutraLabel} 
+                  onChange={(e) => updateProp('sutraLabel', e.target.value)}
+                  style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ margin: 0 }}>
+                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Number</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. 1.1" 
+                  value={props.block.props.sutraNumber} 
+                  onChange={(e) => updateProp('sutraNumber', e.target.value)}
+                  style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ gridColumn: 'span 3', margin: '4px 0 0 0' }}>
+                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Devanāgarī Text</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. अथ योगानुशासनम्" 
+                  value={props.block.props.devanagari} 
+                  onChange={(e) => updateProp('devanagari', e.target.value)}
+                  className="devanagari-font"
+                  style={{ width: '100%', padding: '6px', fontSize: '14px', border: '1px solid var(--border-color)', borderRadius: '4px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ gridColumn: 'span 3', margin: '4px 0 0 0' }}>
+                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Translation / Details</label>
+                <textarea 
+                  rows={2}
+                  placeholder="Now begins the instruction on Yoga." 
+                  value={props.block.props.translation} 
+                  onChange={(e) => updateProp('translation', e.target.value)}
+                  style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                <strong>{props.block.props.bookName || 'Sanskrit Work'}</strong>
+                <span>{props.block.props.sutraLabel || 'Sūtra'} {props.block.props.sutraNumber}</span>
+              </div>
+              {props.block.props.devanagari && (
+                <div className="devanagari-font" style={{ fontSize: '20px', color: 'var(--accent-color)', margin: '12px 0', textAlign: 'center' }}>
+                  {props.block.props.devanagari}
+                </div>
+              )}
+              {props.block.props.translation && (
+                <div style={{ fontSize: '14px', fontStyle: 'italic', borderTop: '1px solid var(--border-color)', paddingTop: '8px', color: 'var(--text-primary)' }}>
+                  {props.block.props.translation}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+  }
+);
+
+// Component to render Read-Only BlockNote content inside notes list (backward-compatible with plain text)
+function ReadOnlyNoteContent({ content }: { content: string }) {
+  let initialContent = undefined;
+  try {
+    initialContent = JSON.parse(content);
+  } catch (e) {
+    initialContent = [
+      {
+        id: "legacy-text-block",
+        type: "paragraph",
+        content: content
+      }
+    ];
+  }
+
+  const editor = useBlockNote({
+    editable: false,
+    initialContent: initialContent,
+    blockSpecs: {
+      ...defaultBlockSpecs,
+      sutraBox: SutraBoxBlock
+    }
+  });
+
+  return (
+    <div className="readonly-editor-wrapper" style={{ margin: '-10px 0' }}>
+      <BlockNoteView editor={editor} theme="light" />
+    </div>
+  );
+}
+
+// Component to render Editable BlockNote editor inside Note modal
+function NoteEditor({ onChange, initialContent }: { onChange: (json: string) => void, initialContent?: string }) {
+  let parsedContent = undefined;
+  if (initialContent) {
+    try {
+      parsedContent = JSON.parse(initialContent);
+    } catch (e) {
+      parsedContent = [
+        {
+          type: "paragraph",
+          content: initialContent
+        }
+      ];
+    }
+  }
+
+  const editor = useBlockNote({
+    initialContent: parsedContent,
+    blockSpecs: {
+      ...defaultBlockSpecs,
+      sutraBox: SutraBoxBlock
+    },
+    onEditorContentChange: (editor) => {
+      onChange(JSON.stringify(editor.topLevelBlocks));
+    }
+  });
+
+  return (
+    <div className="note-editor-wrapper" style={{ border: '1px solid var(--border-color)', borderRadius: '6px', minHeight: '200px', backgroundColor: '#fff', overflow: 'hidden' }}>
+      <div style={{ padding: '8px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '8px', backgroundColor: 'var(--bg-secondary)' }}>
+        <button 
+          type="button"
+          onClick={() => {
+            editor.insertBlocks(
+              [{ type: "sutraBox" }],
+              editor.getTextCursorPosition().block,
+              "after"
+            );
+          }}
+          className="btn-sec"
+          style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+        >
+          📖 Insert Sutra Box
+        </button>
+      </div>
+      <BlockNoteView editor={editor} theme="light" />
+    </div>
+  );
+}
+
 const getBookTitleDisplay = (book: Book | null): string => {
   if (!book) return '';
   if (book.title_iast) return book.title_iast;
@@ -74,12 +270,15 @@ export default function App() {
   // Navigation & Data States
   const [books, setBooks] = useState<Book[]>([]);
   const [activeBook, setActiveBook] = useState<Book | null>(null);
-  const [sections, setSections] = useState<Section[]>([]);
+  const [bookTrees, setBookTrees] = useState<Record<number, Section[]>>({});
+  const [expandedBooks, setExpandedBooks] = useState<Record<number, boolean>>({});
   const [activeSection, setActiveSection] = useState<Section | null>(null);
   const [sutras, setSutras] = useState<Sutra[]>([]);
   const [activeSutra, setActiveSutra] = useState<Sutra | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
+
+  const sections = activeBook ? (bookTrees[activeBook.id] || []) : [];
 
   // UI Control States
   const [showBookModal, setShowBookModal] = useState(false);
@@ -98,7 +297,7 @@ export default function App() {
   // New Record Form States
   const [newBook, setNewBook] = useState({ title: '', title_devanagari: '', title_iast: '', author: '', description: '' });
   const [newSection, setNewSection] = useState({ title: '', title_devanagari: '', title_iast: '', parent: '' as string | number });
-  const [newSutra, setNewSutra] = useState({ devanagari_text: '', transliteration_text: '', english_translation: '', order: 0 });
+  const [newSutra, setNewSutra] = useState({ item_label: 'Sūtra', item_number: '', devanagari_text: '', transliteration_text: '', english_translation: '', order: 0 });
   const [newNote, setNewNote] = useState({ 
     title: '', content: '', 
     ref_sutra_devanagari: '', ref_sutra_transliteration: '', ref_sutra_translation: '' 
@@ -112,6 +311,7 @@ export default function App() {
   const [editSectionTitleDev, setEditSectionTitleDev] = useState('');
   const [editSectionTitleIast, setEditSectionTitleIast] = useState('');
   const [editSectionParent, setEditSectionParent] = useState<string | number>('');
+  const [editSectionHk, setEditSectionHk] = useState('');
 
   // Edit Book States
   const [showEditBookModal, setShowEditBookModal] = useState(false);
@@ -120,6 +320,7 @@ export default function App() {
   const [editBookTitleIast, setEditBookTitleIast] = useState('');
   const [editBookAuthor, setEditBookAuthor] = useState('');
   const [editBookDescription, setEditBookDescription] = useState('');
+  const [editBookHk, setEditBookHk] = useState('');
 
   // Edit Sutra States
   const [editingSutra, setEditingSutra] = useState<Sutra | null>(null);
@@ -128,6 +329,9 @@ export default function App() {
   const [editSutraTransliteration, setEditSutraTransliteration] = useState('');
   const [editSutraTranslation, setEditSutraTranslation] = useState('');
   const [editSutraOrder, setEditSutraOrder] = useState<number>(0);
+  const [editSutraHk, setEditSutraHk] = useState('');
+  const [editSutraItemLabel, setEditSutraItemLabel] = useState('Sūtra');
+  const [editSutraItemNumber, setEditSutraItemNumber] = useState('');
 
   // Helper to flatten the section tree
   const getFlatSections = (sectionsList: Section[]): Section[] => {
@@ -187,10 +391,19 @@ export default function App() {
   const fetchBooks = async () => {
     try {
       const res = await fetch(`${API_BASE}/books/`);
-      const data = await res.json();
-      setBooks(data);
-      if (data.length > 0 && !activeBook) {
-        setActiveBook(data[0]);
+      const booksData = await res.json();
+      setBooks(booksData);
+      
+      const trees: Record<number, Section[]> = {};
+      for (const b of booksData) {
+        const treeRes = await fetch(`${API_BASE}/books/${b.id}/tree/`);
+        const treeData = await treeRes.json();
+        trees[b.id] = treeData;
+      }
+      setBookTrees(trees);
+
+      if (booksData.length > 0 && !activeBook) {
+        setActiveBook(booksData[0]);
       }
     } catch (e) {
       console.error("Error fetching books", e);
@@ -201,10 +414,14 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/books/${bookId}/tree/`);
       const data = await res.json();
-      setSections(data);
+      setBookTrees(prev => ({ ...prev, [bookId]: data }));
     } catch (e) {
       console.error("Error fetching section tree", e);
     }
+  };
+
+  const toggleBookExpanded = (bookId: number) => {
+    setExpandedBooks(prev => ({ ...prev, [bookId]: !prev[bookId] }));
   };
 
   const fetchSutras = async (sectionId: number) => {
@@ -285,6 +502,7 @@ export default function App() {
     setEditBookTitleIast(activeBook.title_iast || '');
     setEditBookAuthor(activeBook.author || '');
     setEditBookDescription(activeBook.description || '');
+    setEditBookHk(iastToHk(activeBook.title_iast || activeBook.title || ''));
     setShowEditBookModal(true);
   };
 
@@ -343,6 +561,7 @@ export default function App() {
     setEditSectionTitleDev(section.title_devanagari || '');
     setEditSectionTitleIast(section.title_iast || '');
     setEditSectionParent(section.parent || '');
+    setEditSectionHk(iastToHk(section.title_iast || section.title || ''));
     setShowEditSectionModal(true);
   };
 
@@ -411,7 +630,7 @@ export default function App() {
       setSutras([...sutras, data]);
       if (!activeSutra) setActiveSutra(data);
       setShowSutraModal(false);
-      setNewSutra({ devanagari_text: '', transliteration_text: '', english_translation: '', order: sutras.length + 1 });
+      setNewSutra({ item_label: 'Sūtra', item_number: '', devanagari_text: '', transliteration_text: '', english_translation: '', order: sutras.length + 1 });
     } catch (e) {
       console.error(e);
     }
@@ -424,6 +643,9 @@ export default function App() {
     setEditSutraTransliteration(activeSutra.transliteration_text || '');
     setEditSutraTranslation(activeSutra.english_translation || '');
     setEditSutraOrder(activeSutra.order || 0);
+    setEditSutraHk(iastToHk(activeSutra.transliteration_text || ''));
+    setEditSutraItemLabel(activeSutra.item_label || 'Sūtra');
+    setEditSutraItemNumber(activeSutra.item_number || '');
     setShowEditSutraModal(true);
   };
 
@@ -433,6 +655,8 @@ export default function App() {
     try {
       const payload = {
         section: activeSection.id,
+        item_label: editSutraItemLabel,
+        item_number: editSutraItemNumber,
         devanagari_text: editSutraDevanagari,
         transliteration_text: editSutraTransliteration,
         english_translation: editSutraTranslation,
@@ -527,7 +751,11 @@ export default function App() {
       <div key={sec.id} style={{ marginLeft: `${depth * 12}px` }} className="section-tree-item">
         <div className={`section-item-row ${activeSection?.id === sec.id ? 'active' : ''}`}>
           <button 
-            onClick={() => setActiveSection(sec)}
+            onClick={() => {
+              const book = books.find(b => b.id === sec.book);
+              if (book) setActiveBook(book);
+              setActiveSection(sec);
+            }}
             className="sidebar-section-btn"
           >
             <FolderPlus size={16} className="icon-sep" />
@@ -583,21 +811,11 @@ export default function App() {
 
         <div className="header-controls">
           {/* Book Switcher */}
-          <div className="book-switcher">
+          <div className="book-switcher" style={{ display: 'flex', alignItems: 'center' }}>
             <BookIcon size={18} className="control-icon" />
-            <select 
-              value={activeBook?.id || ''} 
-              onChange={(e) => {
-                const book = books.find(b => b.id === Number(e.target.value));
-                if (book) setActiveBook(book);
-              }}
-              className="book-select"
-            >
-              <option value="" disabled>Select Work...</option>
-              {books.map(b => (
-                <option key={b.id} value={b.id}>{getBookTitleDisplay(b)}</option>
-              ))}
-            </select>
+            <span className="active-book-display" style={{ fontWeight: '600', color: 'var(--text-primary)', marginRight: '8px' }}>
+              {activeBook ? getBookTitleDisplay(activeBook) : 'No work active'}
+            </span>
             {activeBook && (
               <button className="add-btn-small" style={{ backgroundColor: 'var(--text-secondary)', marginRight: '4px' }} onClick={handleEditBookClick} title="Rename / Edit Book">
                 <Edit size={16} />
@@ -628,10 +846,39 @@ export default function App() {
           </div>
           
           <div className="sidebar-tree-content">
-            {sections.length > 0 ? (
-              renderSectionTree(sections)
+            {books.length > 0 ? (
+              books.map((b) => {
+                const isExpanded = !!expandedBooks[b.id];
+                const bTree = bookTrees[b.id] || [];
+                return (
+                  <div key={b.id} className="sidebar-book-group" style={{ marginBottom: '12px' }}>
+                    <div className={`book-item-row ${activeBook?.id === b.id ? 'active' : ''}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', backgroundColor: activeBook?.id === b.id ? 'var(--bg-secondary)' : 'transparent' }}>
+                      <button 
+                        onClick={() => {
+                          setActiveBook(b);
+                          toggleBookExpanded(b.id);
+                        }}
+                        className="sidebar-book-btn"
+                        style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', color: 'inherit', font: 'inherit', cursor: 'pointer', textAlign: 'left', width: '100%' }}
+                      >
+                        <BookIcon size={16} className="icon-sep" style={{ marginRight: '8px' }} />
+                        <span className="book-title-txt" style={{ fontWeight: activeBook?.id === b.id ? '600' : '500' }}>{getBookTitleDisplay(b)}</span>
+                      </button>
+                    </div>
+                    {isExpanded && (
+                      <div className="book-sections-container" style={{ marginLeft: '16px', marginTop: '4px', borderLeft: '1px solid var(--border-color)', paddingLeft: '8px' }}>
+                        {bTree.length > 0 ? (
+                          renderSectionTree(bTree)
+                        ) : (
+                          <p className="sidebar-empty-sections" style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '4px 0' }}>No chapters added yet.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             ) : (
-              <p className="empty-state-text">No study sections added yet. Click the '+' icon above to start.</p>
+              <p className="empty-state-text">No study books added yet. Click the '+' icon in the top right to start.</p>
             )}
           </div>
 
@@ -684,7 +931,7 @@ export default function App() {
                       onClick={() => setActiveSutra(s)}
                       className={`sutra-tab-btn ${activeSutra?.id === s.id ? 'active' : ''}`}
                     >
-                      Sūtra {idx + 1}
+                      {s.item_label || 'Sūtra'} {s.item_number || (idx + 1)}
                     </button>
                   ))}
                 </div>
@@ -697,7 +944,7 @@ export default function App() {
                   {/* Sutra Main Panel (Gita Super Site Inspired) */}
                   <div className="sutra-primary-display">
                     <div className="sutra-display-header">
-                      <span className="sutra-number-badge">Sūtra #{sutras.indexOf(activeSutra) + 1}</span>
+                      <span className="sutra-number-badge">{activeSutra.item_label || 'Sūtra'} #{activeSutra.item_number || (sutras.indexOf(activeSutra) + 1)}</span>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button className="delete-icon-btn" style={{ color: 'var(--text-secondary)' }} onClick={handleEditSutraClick} title="Edit Sutra">
                           <Edit size={16} />
@@ -752,7 +999,7 @@ export default function App() {
                             </div>
                             
                             <div className="note-item-content">
-                              {n.content}
+                              <ReadOnlyNoteContent content={n.content} />
                             </div>
 
                             {/* Optional Reference Sutra embedded in Note */}
@@ -944,8 +1191,10 @@ export default function App() {
                   type="text" 
                   placeholder="Type title in HK to rename..." 
                   className="assistant-input"
+                  value={editBookHk}
                   onChange={(e) => {
                     const val = e.target.value;
+                    setEditBookHk(val);
                     setEditBookTitle(val);
                     setEditBookTitleDev(hkToDevanagari(val));
                     setEditBookTitleIast(hkToIast(val));
@@ -1082,8 +1331,10 @@ export default function App() {
                   type="text" 
                   placeholder="Type title in HK to rename..." 
                   className="assistant-input"
+                  value={editSectionHk}
                   onChange={(e) => {
                     const val = e.target.value;
+                    setEditSectionHk(val);
                     setEditSectionTitle(val);
                     setEditSectionTitleDev(hkToDevanagari(val));
                     setEditSectionTitleIast(hkToIast(val));
@@ -1145,6 +1396,27 @@ export default function App() {
             </div>
             <form onSubmit={handleAddSutra} className="modal-form">
               
+              <div className="form-row-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Type / Label of Item *</label>
+                  <input 
+                    type="text" required
+                    placeholder="e.g. Sūtra, Verse, Sloka, Mantra..." 
+                    value={newSutra.item_label}
+                    onChange={(e) => setNewSutra({ ...newSutra, item_label: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Display Number / ID *</label>
+                  <input 
+                    type="text" required
+                    placeholder="e.g. 1.1, I.1, 43a, 1..." 
+                    value={newSutra.item_number}
+                    onChange={(e) => setNewSutra({ ...newSutra, item_number: e.target.value })}
+                  />
+                </div>
+              </div>
+
               <div className="form-group">
                 <label>Harvard-Kyoto Typing Assistant (Optional - supports multi-line)</label>
                 <textarea 
@@ -1212,14 +1484,37 @@ export default function App() {
             </div>
             <form onSubmit={handleEditSutra} className="modal-form">
               
+              <div className="form-row-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Type / Label of Item *</label>
+                  <input 
+                    type="text" required
+                    placeholder="e.g. Sūtra, Verse, Sloka, Mantra..." 
+                    value={editSutraItemLabel}
+                    onChange={(e) => setEditSutraItemLabel(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Display Number / ID *</label>
+                  <input 
+                    type="text" required
+                    placeholder="e.g. 1.1, I.1, 43a, 1..." 
+                    value={editSutraItemNumber}
+                    onChange={(e) => setEditSutraItemNumber(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="form-group">
                 <label>Harvard-Kyoto Typing Assistant (Optional - supports multi-line)</label>
                 <textarea 
                   rows={4}
                   placeholder="Type in HK format here to instantly auto-populate Devanāgarī and IAST below: e.g. atha yogAnuSAsanam..." 
                   className="assistant-input"
+                  value={editSutraHk}
                   onChange={(e) => {
                     const val = e.target.value;
+                    setEditSutraHk(val);
                     setEditSutraDevanagari(hkToDevanagari(val));
                     setEditSutraTransliteration(hkToIast(val));
                   }}
@@ -1288,11 +1583,9 @@ export default function App() {
 
               <div className="form-group">
                 <label>Commentary Body *</label>
-                <textarea 
-                  rows={4} required
-                  placeholder="Write your study notes and analysis..." 
-                  value={newNote.content}
-                  onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
+                <NoteEditor 
+                  onChange={(json) => setNewNote({ ...newNote, content: json })}
+                  initialContent={newNote.content}
                 />
               </div>
 
