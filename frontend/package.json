@@ -11,9 +11,7 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "lucide-react": "^0.263.0",
-    "@blocknote/core": "^0.11.2",
-    "@blocknote/react": "^0.11.2"
+    "lucide-react": "^0.263.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",

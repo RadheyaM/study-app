@@ -71,12 +71,14 @@ class Note(models.Model):
         blank=True
     )
     title = models.CharField(max_length=255, blank=True, default='')
-    content = models.TextField(help_text="Personal commentary or observations (Markdown supported)")
+    content = models.TextField(blank=True, default='', help_text="Personal commentary or observations (Markdown supported)")
     
     # Reference Sutra fields (Optional, matching the main Sutra structure)
     ref_sutra_devanagari = models.TextField(blank=True, null=True)
     ref_sutra_transliteration = models.TextField(blank=True, null=True)
     ref_sutra_translation = models.TextField(blank=True, null=True)
+    source_text = models.CharField(max_length=255, blank=True, null=True)
+    source_text_ref = models.CharField(max_length=255, blank=True, null=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
 import { 
-  BookOpen, Plus, FolderPlus, FileText, Search, Book as BookIcon, 
+  BookOpen, Plus, FolderPlus, Folder, FileText, Search, Book as BookIcon, 
   Trash2, Edit, X 
 } from 'lucide-react';
 import { hkToDevanagari, hkToIast, iastToHk } from './sanscript';
-import { defaultProps, defaultBlockSpecs } from "@blocknote/core";
-import { BlockNoteView, useBlockNote, createReactBlockSpec } from "@blocknote/react";
-import "@blocknote/react/style.css";
 import './index.css';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -50,6 +47,8 @@ interface Note {
   ref_sutra_devanagari?: string | null;
   ref_sutra_transliteration?: string | null;
   ref_sutra_translation?: string | null;
+  source_text?: string | null;
+  source_text_ref?: string | null;
 }
 
 interface Term {
@@ -61,193 +60,32 @@ interface Term {
   notes: number[];
 }
 
-// Custom Sutra Box Block for BlockNote
-export const SutraBoxBlock = createReactBlockSpec(
-  {
-    type: "sutraBox",
-    propSchema: {
-      ...defaultProps,
-      bookName: { default: "" },
-      sutraLabel: { default: "Sūtra" },
-      sutraNumber: { default: "" },
-      devanagari: { default: "" },
-      translation: { default: "" }
-    },
-    content: "none"
-  },
-  {
-    render: (props: any) => {
-      const updateProp = (field: string, val: string) => {
-        props.editor.updateBlock(props.block, {
-          type: "sutraBox",
-          props: {
-            ...props.block.props,
-            [field]: val
-          }
-        });
-      };
-
-      const isEditable = props.editor.isEditable;
-
-      return (
-        <div className="embedded-reference-sutra" style={{ border: '2px solid var(--accent-color)', padding: '16px', borderRadius: '8px', margin: '12px 0', backgroundColor: 'var(--bg-secondary)', width: '100%', boxSizing: 'border-box' }}>
-          <span className="ref-badge" style={{ backgroundColor: 'var(--accent-color)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 'bold' }}>Embedded Sutra Card</span>
-          
-          {isEditable ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginTop: '12px' }}>
-              <div style={{ margin: 0 }}>
-                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Book Name</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Yoga Sūtras" 
-                  value={props.block.props.bookName} 
-                  onChange={(e) => updateProp('bookName', e.target.value)}
-                  style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div style={{ margin: 0 }}>
-                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Item Label</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Verse, Sūtra" 
-                  value={props.block.props.sutraLabel} 
-                  onChange={(e) => updateProp('sutraLabel', e.target.value)}
-                  style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div style={{ margin: 0 }}>
-                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Number</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. 1.1" 
-                  value={props.block.props.sutraNumber} 
-                  onChange={(e) => updateProp('sutraNumber', e.target.value)}
-                  style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div style={{ gridColumn: 'span 3', margin: '4px 0 0 0' }}>
-                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Devanāgarī Text</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. अथ योगानुशासनम्" 
-                  value={props.block.props.devanagari} 
-                  onChange={(e) => updateProp('devanagari', e.target.value)}
-                  className="devanagari-font"
-                  style={{ width: '100%', padding: '6px', fontSize: '14px', border: '1px solid var(--border-color)', borderRadius: '4px', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div style={{ gridColumn: 'span 3', margin: '4px 0 0 0' }}>
-                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Translation / Details</label>
-                <textarea 
-                  rows={2}
-                  placeholder="Now begins the instruction on Yoga." 
-                  value={props.block.props.translation} 
-                  onChange={(e) => updateProp('translation', e.target.value)}
-                  style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', resize: 'vertical', boxSizing: 'border-box' }}
-                />
-              </div>
-            </div>
-          ) : (
-            <div style={{ marginTop: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                <strong>{props.block.props.bookName || 'Sanskrit Work'}</strong>
-                <span>{props.block.props.sutraLabel || 'Sūtra'} {props.block.props.sutraNumber}</span>
-              </div>
-              {props.block.props.devanagari && (
-                <div className="devanagari-font" style={{ fontSize: '20px', color: 'var(--accent-color)', margin: '12px 0', textAlign: 'center' }}>
-                  {props.block.props.devanagari}
-                </div>
-              )}
-              {props.block.props.translation && (
-                <div style={{ fontSize: '14px', fontStyle: 'italic', borderTop: '1px solid var(--border-color)', paddingTop: '8px', color: 'var(--text-primary)' }}>
-                  {props.block.props.translation}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      );
-    }
-  }
-);
-
-// Component to render Read-Only BlockNote content inside notes list (backward-compatible with plain text)
+// Component to render Read-Only note content (backward-compatible with legacy BlockNote JSON blocks)
 function ReadOnlyNoteContent({ content }: { content: string }) {
-  let initialContent = undefined;
+  let displayContent = content;
   try {
-    initialContent = JSON.parse(content);
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) {
+      displayContent = parsed
+        .map((block: any) => {
+          if (block.content) {
+            if (typeof block.content === 'string') return block.content;
+            if (Array.isArray(block.content)) {
+              return block.content.map((c: any) => c.text || '').join('');
+            }
+          }
+          return '';
+        })
+        .filter(text => text !== '')
+        .join('\n');
+    }
   } catch (e) {
-    initialContent = [
-      {
-        id: "legacy-text-block",
-        type: "paragraph",
-        content: content
-      }
-    ];
+    // Keep as plain text
   }
 
-  const editor = useBlockNote({
-    editable: false,
-    initialContent: initialContent,
-    blockSpecs: {
-      ...defaultBlockSpecs,
-      sutraBox: SutraBoxBlock
-    }
-  });
-
   return (
-    <div className="readonly-editor-wrapper" style={{ margin: '-10px 0' }}>
-      <BlockNoteView editor={editor} theme="light" />
-    </div>
-  );
-}
-
-// Component to render Editable BlockNote editor inside Note modal
-function NoteEditor({ onChange, initialContent }: { onChange: (json: string) => void, initialContent?: string }) {
-  let parsedContent = undefined;
-  if (initialContent) {
-    try {
-      parsedContent = JSON.parse(initialContent);
-    } catch (e) {
-      parsedContent = [
-        {
-          type: "paragraph",
-          content: initialContent
-        }
-      ];
-    }
-  }
-
-  const editor = useBlockNote({
-    initialContent: parsedContent,
-    blockSpecs: {
-      ...defaultBlockSpecs,
-      sutraBox: SutraBoxBlock
-    },
-    onEditorContentChange: (editor) => {
-      onChange(JSON.stringify(editor.topLevelBlocks));
-    }
-  });
-
-  return (
-    <div className="note-editor-wrapper" style={{ border: '1px solid var(--border-color)', borderRadius: '6px', minHeight: '200px', backgroundColor: '#fff', overflow: 'hidden' }}>
-      <div style={{ padding: '8px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '8px', backgroundColor: 'var(--bg-secondary)' }}>
-        <button 
-          type="button"
-          onClick={() => {
-            editor.insertBlocks(
-              [{ type: "sutraBox" }],
-              editor.getTextCursorPosition().block,
-              "after"
-            );
-          }}
-          className="btn-sec"
-          style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-        >
-          📖 Insert Sutra Box
-        </button>
-      </div>
-      <BlockNoteView editor={editor} theme="light" />
+    <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.6', color: 'var(--text-primary)' }}>
+      {displayContent}
     </div>
   );
 }
@@ -274,6 +112,7 @@ export default function App() {
   const [expandedBooks, setExpandedBooks] = useState<Record<number, boolean>>({});
   const [activeSection, setActiveSection] = useState<Section | null>(null);
   const [sutras, setSutras] = useState<Sutra[]>([]);
+  const [allSutras, setAllSutras] = useState<Sutra[]>([]);
   const [activeSutra, setActiveSutra] = useState<Sutra | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
@@ -285,6 +124,7 @@ export default function App() {
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [showSutraModal, setShowSutraModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
+  const [showRefSutraModal, setShowRefSutraModal] = useState(false);
   const [showTermIndex, setShowTermIndex] = useState(false);
   const [showTermModal, setShowTermModal] = useState(false);
   const [termSearch, setTermSearch] = useState('');
@@ -300,7 +140,8 @@ export default function App() {
   const [newSutra, setNewSutra] = useState({ item_label: 'Sūtra', item_number: '', devanagari_text: '', transliteration_text: '', english_translation: '', order: 0 });
   const [newNote, setNewNote] = useState({ 
     title: '', content: '', 
-    ref_sutra_devanagari: '', ref_sutra_transliteration: '', ref_sutra_translation: '' 
+    ref_sutra_devanagari: '', ref_sutra_transliteration: '', ref_sutra_translation: '',
+    source_text: '', source_text_ref: ''
   });
   const [newTerm, setNewTerm] = useState({ sanskrit_term_devanagari: '', sanskrit_term_iast: '', definition: '' });
 
@@ -333,6 +174,19 @@ export default function App() {
   const [editSutraItemLabel, setEditSutraItemLabel] = useState('Sūtra');
   const [editSutraItemNumber, setEditSutraItemNumber] = useState('');
 
+  // Edit Note States
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [showEditNoteModal, setShowEditNoteModal] = useState(false);
+  const [showEditRefSutraModal, setShowEditRefSutraModal] = useState(false);
+  const [editNoteTitle, setEditNoteTitle] = useState('');
+  const [editNoteContent, setEditNoteContent] = useState('');
+  const [editNoteRefSutraDevanagari, setEditNoteRefSutraDevanagari] = useState('');
+  const [editNoteRefSutraTransliteration, setEditNoteRefSutraTransliteration] = useState('');
+  const [editNoteRefSutraTranslation, setEditNoteRefSutraTranslation] = useState('');
+  const [editNoteSourceText, setEditNoteSourceText] = useState('');
+  const [editNoteSourceTextRef, setEditNoteSourceTextRef] = useState('');
+  const [editNoteHk, setEditNoteHk] = useState('');
+
   // Helper to flatten the section tree
   const getFlatSections = (sectionsList: Section[]): Section[] => {
     const flat: Section[] = [];
@@ -352,6 +206,7 @@ export default function App() {
   useEffect(() => {
     fetchBooks();
     fetchTerms();
+    fetchAllSutras();
   }, []);
 
   // Sync active book tree
@@ -388,6 +243,16 @@ export default function App() {
   }, [hkHelperInput]);
 
   // API Call Helpers
+  const fetchAllSutras = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/sutras/`);
+      const data = await res.json();
+      setAllSutras(data);
+    } catch (e) {
+      console.error("Error fetching all sutras", e);
+    }
+  };
+
   const fetchBooks = async () => {
     try {
       const res = await fetch(`${API_BASE}/books/`);
@@ -628,6 +493,7 @@ export default function App() {
       });
       const data = await res.json();
       setSutras([...sutras, data]);
+      fetchAllSutras(); // sync sidebar sutras list
       if (!activeSutra) setActiveSutra(data);
       setShowSutraModal(false);
       setNewSutra({ item_label: 'Sūtra', item_number: '', devanagari_text: '', transliteration_text: '', english_translation: '', order: sutras.length + 1 });
@@ -669,6 +535,7 @@ export default function App() {
       });
       const data = await res.json();
       setSutras(sutras.map(s => s.id === editingSutra.id ? data : s));
+      fetchAllSutras(); // sync sidebar sutras list
       setActiveSutra(data);
       setShowEditSutraModal(false);
       setEditingSutra(null);
@@ -682,9 +549,15 @@ export default function App() {
     if (!activeSection) return;
     try {
       const payload = {
-        ...newNote,
+        title: newNote.title,
+        content: newNote.content,
         section: activeSutra ? null : activeSection.id,
-        sutra: activeSutra ? activeSutra.id : null
+        sutra: activeSutra ? activeSutra.id : null,
+        ref_sutra_devanagari: newNote.ref_sutra_devanagari || null,
+        ref_sutra_transliteration: newNote.ref_sutra_transliteration || null,
+        ref_sutra_translation: newNote.ref_sutra_translation || null,
+        source_text: newNote.source_text || null,
+        source_text_ref: newNote.source_text_ref || null
       };
       const res = await fetch(`${API_BASE}/notes/`, {
         method: 'POST',
@@ -694,7 +567,12 @@ export default function App() {
       const data = await res.json();
       setNotes([...notes, data]);
       setShowNoteModal(false);
-      setNewNote({ title: '', content: '', ref_sutra_devanagari: '', ref_sutra_transliteration: '', ref_sutra_translation: '' });
+      setShowRefSutraModal(false);
+      setNewNote({ 
+        title: '', content: '', 
+        ref_sutra_devanagari: '', ref_sutra_transliteration: '', ref_sutra_translation: '',
+        source_text: '', source_text_ref: ''
+      });
     } catch (e) {
       console.error(e);
     }
@@ -727,6 +605,7 @@ export default function App() {
     try {
       await fetch(`${API_BASE}/sutras/${id}/`, { method: 'DELETE' });
       setSutras(sutras.filter(s => s.id !== id));
+      fetchAllSutras(); // sync sidebar sutras list
       if (activeSutra?.id === id) {
         setActiveSutra(sutras[0] || null);
       }
@@ -745,52 +624,155 @@ export default function App() {
     }
   };
 
+  const handleStartEditNote = (note: Note) => {
+    setEditingNote(note);
+    setEditNoteTitle(note.title || '');
+    setEditNoteContent(note.content || '');
+    setEditNoteRefSutraDevanagari(note.ref_sutra_devanagari || '');
+    setEditNoteRefSutraTransliteration(note.ref_sutra_transliteration || '');
+    setEditNoteRefSutraTranslation(note.ref_sutra_translation || '');
+    setEditNoteSourceText(note.source_text || '');
+    setEditNoteSourceTextRef(note.source_text_ref || '');
+    setEditNoteHk(note.ref_sutra_transliteration ? iastToHk(note.ref_sutra_transliteration) : '');
+    
+    // Open correct edit modal based on note type
+    if (note.source_text || note.source_text_ref || note.ref_sutra_devanagari) {
+      setShowEditRefSutraModal(true);
+    } else {
+      setShowEditNoteModal(true);
+    }
+  };
+
+  const handleEditNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNote) return;
+    try {
+      const payload = {
+        title: editNoteTitle,
+        content: editNoteContent,
+        ref_sutra_devanagari: editNoteRefSutraDevanagari || null,
+        ref_sutra_transliteration: editNoteRefSutraTransliteration || null,
+        ref_sutra_translation: editNoteRefSutraTranslation || null,
+        source_text: editNoteSourceText || null,
+        source_text_ref: editNoteSourceTextRef || null
+      };
+      const res = await fetch(`${API_BASE}/notes/${editingNote.id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setNotes(notes.map(n => n.id === editingNote.id ? data : n));
+      setShowEditNoteModal(false);
+      setShowEditRefSutraModal(false);
+      setEditingNote(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Sidebar tree rendering
   const renderSectionTree = (sectionsList: Section[], depth = 0) => {
-    return sectionsList.map((sec) => (
-      <div key={sec.id} style={{ marginLeft: `${depth * 12}px` }} className="section-tree-item">
-        <div className={`section-item-row ${activeSection?.id === sec.id ? 'active' : ''}`}>
-          <button 
-            onClick={() => {
-              const book = books.find(b => b.id === sec.book);
-              if (book) setActiveBook(book);
-              setActiveSection(sec);
-            }}
-            className="sidebar-section-btn"
-          >
-            <FolderPlus size={16} className="icon-sep" />
-            <span className="section-title-txt">{getSectionTitleDisplay(sec)}</span>
-          </button>
-          <div className="section-item-actions">
+    return sectionsList.map((sec) => {
+      const isContainer = sec.subsections && sec.subsections.length > 0;
+      const leafSutras = allSutras
+        .filter(s => s.section === sec.id)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+      return (
+        <div key={sec.id} style={{ marginLeft: `${depth * 12}px` }} className="section-tree-item">
+          <div className={`section-item-row ${activeSection?.id === sec.id ? 'active' : ''}`}>
             <button 
-              className="action-icon-btn" 
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEditSectionClick(sec);
+              onClick={() => {
+                if (isContainer) return; // Container section - does not have active sutra page of its own
+                const book = books.find(b => b.id === sec.book);
+                if (book) setActiveBook(book);
+                setActiveSection(sec);
               }}
-              title="Rename / Move Section"
-            >
-              <Edit size={14} />
-            </button>
-            <button 
-              className="action-icon-btn delete-action" 
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteSection(sec.id);
+              className="sidebar-section-btn"
+              style={{ 
+                cursor: isContainer ? 'default' : 'pointer',
+                fontWeight: isContainer ? '600' : 'normal',
+                opacity: isContainer ? 0.85 : 1
               }}
-              title="Delete Section"
             >
-              <Trash2 size={14} />
+              {isContainer ? (
+                <Folder size={16} className="icon-sep" style={{ color: 'var(--accent-gold)' }} />
+              ) : (
+                <FolderPlus size={16} className="icon-sep" />
+              )}
+              <span className="section-title-txt">{getSectionTitleDisplay(sec)}</span>
             </button>
+            <div className="section-item-actions">
+              <button 
+                className="action-icon-btn" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditSectionClick(sec);
+                }}
+                title="Rename / Move Section"
+              >
+                <Edit size={14} />
+              </button>
+              <button 
+                className="action-icon-btn delete-action" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteSection(sec.id);
+                }}
+                title="Delete Section"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
+          
+          {/* Sutras contained within this leaf section */}
+          {!isContainer && leafSutras.length > 0 && (
+            <div className="sidebar-sutras-container" style={{ marginLeft: '16px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {leafSutras.map((s, sIdx) => (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    const book = books.find(b => b.id === sec.book);
+                    if (book) setActiveBook(book);
+                    setActiveSection(sec);
+                    setActiveSutra(s);
+                  }}
+                  className={`sidebar-sutra-link ${activeSutra?.id === s.id ? 'active' : ''}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: 'none',
+                    border: 'none',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: '12.5px',
+                    color: activeSutra?.id === s.id ? 'var(--accent-gold)' : 'var(--text-secondary)',
+                    fontWeight: activeSutra?.id === s.id ? '600' : 'normal',
+                    width: '100%',
+                    gap: '6px'
+                  }}
+                >
+                  <FileText size={11} style={{ opacity: 0.65, minWidth: '11px' }} />
+                  <span className="sutra-sidebar-txt" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {s.item_label || 'Sūtra'} {s.item_number || (sIdx + 1)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {sec.subsections && sec.subsections.length > 0 && (
+            <div className="nested-sections-container">
+              {renderSectionTree(sec.subsections, depth + 1)}
+            </div>
+          )}
         </div>
-        {sec.subsections && sec.subsections.length > 0 && (
-          <div className="nested-sections-container">
-            {renderSectionTree(sec.subsections, depth + 1)}
-          </div>
-        )}
-      </div>
-    ));
+      );
+    });
   };
 
   // Filtered terms
@@ -980,11 +962,16 @@ export default function App() {
 
                   {/* COMMENTARIES & PERSONAL NOTES (Below the primary text block) */}
                   <div className="commentaries-and-notes-wrapper">
-                    <div className="notes-header-row">
+                    <div className="notes-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h3>Commentary & Notes</h3>
-                      <button className="add-note-btn" onClick={() => setShowNoteModal(true)}>
-                        <Plus size={14} className="icon-sep" /> Add Note
-                      </button>
+                      <div className="notes-action-buttons-header" style={{ display: 'flex', gap: '8px' }}>
+                        <button className="add-note-btn" onClick={() => setShowNoteModal(true)}>
+                          <Plus size={14} className="icon-sep" /> Add Note
+                        </button>
+                        <button className="add-note-btn" onClick={() => setShowRefSutraModal(true)}>
+                          <Plus size={14} className="icon-sep" /> Add Ref Sūtra
+                        </button>
+                      </div>
                     </div>
 
                     {notes.length > 0 ? (
@@ -993,20 +980,34 @@ export default function App() {
                           <div key={n.id} className="note-card-item">
                             <div className="note-item-header">
                               <h4>{n.title || 'Untitled Observation'}</h4>
-                              <button className="delete-icon-btn-small" onClick={() => handleDeleteNote(n.id)}>
-                                <Trash2 size={14} />
-                              </button>
+                              <div className="note-action-buttons" style={{ display: 'flex', gap: '8px' }}>
+                                <button className="edit-icon-btn-small" onClick={() => handleStartEditNote(n)} title="Edit Note">
+                                  <Edit size={14} />
+                                </button>
+                                <button className="delete-icon-btn-small" onClick={() => handleDeleteNote(n.id)} title="Delete Note">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
                             
                             <div className="note-item-content">
                               <ReadOnlyNoteContent content={n.content} />
                             </div>
 
-                            {/* Optional Reference Sutra embedded in Note */}
-                            {n.ref_sutra_devanagari && (
+                            {/* Optional Reference Sutra / Source Location embedded in Note */}
+                            {(n.ref_sutra_devanagari || n.source_text || n.source_text_ref) && (
                               <div className="embedded-reference-sutra">
-                                <span className="ref-badge">Cross-Reference Sutra</span>
-                                <div className="ref-devanagari devanagari-font">{n.ref_sutra_devanagari}</div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                  <span className="ref-badge">Cross-Reference Sūtra</span>
+                                  {(n.source_text || n.source_text_ref) && (
+                                    <span className="source-location-badge" style={{ fontSize: '11px', color: 'var(--accent-gold)', fontWeight: '600' }}>
+                                      {n.source_text}{n.source_text_ref ? ` [${n.source_text_ref}]` : ''}
+                                    </span>
+                                  )}
+                                </div>
+                                {n.ref_sutra_devanagari && (
+                                  <div className="ref-devanagari devanagari-font">{n.ref_sutra_devanagari}</div>
+                                )}
                                 {n.ref_sutra_transliteration && (
                                   <div className="ref-transliteration">{n.ref_sutra_transliteration}</div>
                                 )}
@@ -1564,7 +1565,7 @@ export default function App() {
       {/* 4. NOTE MODAL */}
       {showNoteModal && (
         <div className="modal-backdrop">
-          <div className="modal-card modal-card-large">
+          <div className="modal-card">
             <div className="modal-header">
               <h2>Add Commentary / Note</h2>
               <button className="close-btn" onClick={() => setShowNoteModal(false)}><X size={18} /></button>
@@ -1583,22 +1584,228 @@ export default function App() {
 
               <div className="form-group">
                 <label>Commentary Body *</label>
-                <NoteEditor 
-                  onChange={(json) => setNewNote({ ...newNote, content: json })}
-                  initialContent={newNote.content}
+                <textarea 
+                  rows={8} required
+                  placeholder="Enter your commentary / note here..."
+                  value={newNote.content}
+                  onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
                 />
               </div>
 
-              {/* Reference Sutra Section (Matching main Sutra structure) */}
-              <div className="reference-sutra-collapsible-form">
-                <h3>📖 Add Reference Sūtra (Optional)</h3>
-                <p className="field-subtitle">If you are referencing another work, you can add structured scripture fields below.</p>
-                
-                {/* HK helper trigger inside form */}
+              <div className="form-actions">
+                <button type="button" className="btn-sec" onClick={() => setShowNoteModal(false)}>Cancel</button>
+                <button type="submit" className="btn-pri">Save Note</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4B. EDIT NOTE MODAL */}
+      {showEditNoteModal && editingNote && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h2>Edit Commentary / Note</h2>
+              <button className="close-btn" onClick={() => { setShowEditNoteModal(false); setEditingNote(null); }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleEditNote} className="modal-form">
+              
+              <div className="form-group">
+                <label>Note Title</label>
                 <input 
-                  type="text"
-                  placeholder="Type reference in HK format to auto-populate fields..."
-                  className="hk-ref-helper-input"
+                  type="text" 
+                  placeholder="e.g. Vyasa's exposition of Chitta..." 
+                  value={editNoteTitle}
+                  onChange={(e) => setEditNoteTitle(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Commentary Body *</label>
+                <textarea 
+                  rows={8} required
+                  placeholder="Enter your commentary / note here..."
+                  value={editNoteContent}
+                  onChange={(e) => setEditNoteContent(e.target.value)}
+                />
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn-sec" onClick={() => { setShowEditNoteModal(false); setEditingNote(null); }}>Cancel</button>
+                <button type="submit" className="btn-pri">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4D. EDIT REFERENCE SŪTRA MODAL */}
+      {showEditRefSutraModal && editingNote && (
+        <div className="modal-backdrop">
+          <div className="modal-card modal-card-large">
+            <div className="modal-header">
+              <h2>Edit Reference Sūtra</h2>
+              <button className="close-btn" onClick={() => { setShowEditRefSutraModal(false); setEditingNote(null); }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleEditNote} className="modal-form">
+              
+              <div className="form-row-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Source Scripture / Text Name *</label>
+                  <input 
+                    type="text" required
+                    placeholder="e.g. Bhagavad Gītā, Rgveda, etc." 
+                    value={editNoteSourceText}
+                    onChange={(e) => setEditNoteSourceText(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Source Reference Location *</label>
+                  <input 
+                    type="text" required
+                    placeholder="e.g. 10.5.56, 2.47, etc." 
+                    value={editNoteSourceTextRef}
+                    onChange={(e) => setEditNoteSourceTextRef(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Reference Title / Label (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Mantra on Brahman, Karma Yoga verse..." 
+                  value={editNoteTitle}
+                  onChange={(e) => setEditNoteTitle(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Commentary / Observations (Optional)</label>
+                <textarea 
+                  rows={3}
+                  placeholder="Enter any personal notes or reflections on this reference sūtra..."
+                  value={editNoteContent}
+                  onChange={(e) => setEditNoteContent(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Harvard-Kyoto Typing Assistant (Optional - supports multi-line)</label>
+                <textarea 
+                  rows={3}
+                  placeholder="Type in HK format here to instantly auto-populate Devanāgarī and IAST below..." 
+                  className="assistant-input"
+                  value={editNoteHk}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditNoteHk(val);
+                    setEditNoteRefSutraDevanagari(hkToDevanagari(val));
+                    setEditNoteRefSutraTransliteration(hkToIast(val));
+                  }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Reference Devanāgarī Script *</label>
+                <textarea 
+                  rows={3} required
+                  placeholder="तस्य वाचकः प्रणवः" 
+                  value={editNoteRefSutraDevanagari}
+                  onChange={(e) => setEditNoteRefSutraDevanagari(e.target.value)}
+                  className="devanagari-font"
+                  style={{ fontSize: '18px' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Reference IAST Transliteration</label>
+                <textarea 
+                  rows={3}
+                  placeholder="tasya vācakaḥ praṇavaḥ" 
+                  value={editNoteRefSutraTransliteration}
+                  onChange={(e) => setEditNoteRefSutraTransliteration(e.target.value)}
+                  style={{ fontFamily: 'monospace' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Reference English Translation</label>
+                <textarea 
+                  rows={3}
+                  placeholder="His designated word is Om." 
+                  value={editNoteRefSutraTranslation}
+                  onChange={(e) => setEditNoteRefSutraTranslation(e.target.value)}
+                />
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn-sec" onClick={() => { setShowEditRefSutraModal(false); setEditingNote(null); }}>Cancel</button>
+                <button type="submit" className="btn-pri">Save Reference Sūtra</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4C. ADD REFERENCE SUTRA MODAL */}
+      {showRefSutraModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card modal-card-large">
+            <div className="modal-header">
+              <h2>Add Reference Sūtra</h2>
+              <button className="close-btn" onClick={() => setShowRefSutraModal(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleAddNote} className="modal-form">
+              
+              <div className="form-row-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Source Scripture / Text Name *</label>
+                  <input 
+                    type="text" required
+                    placeholder="e.g. Bhagavad Gītā, Rgveda, etc." 
+                    value={newNote.source_text}
+                    onChange={(e) => setNewNote({ ...newNote, source_text: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Source Reference Location *</label>
+                  <input 
+                    type="text" required
+                    placeholder="e.g. 10.5.56, 2.47, etc." 
+                    value={newNote.source_text_ref}
+                    onChange={(e) => setNewNote({ ...newNote, source_text_ref: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Reference Title / Label (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Mantra on Brahman, Karma Yoga verse..." 
+                  value={newNote.title}
+                  onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Commentary / Observations (Optional)</label>
+                <textarea 
+                  rows={3}
+                  placeholder="Enter any personal notes or reflections on this reference sūtra..."
+                  value={newNote.content}
+                  onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Harvard-Kyoto Typing Assistant (Optional - supports multi-line)</label>
+                <textarea 
+                  rows={3}
+                  placeholder="Type in HK format here to instantly auto-populate Devanāgarī and IAST below..." 
+                  className="assistant-input"
                   onChange={(e) => {
                     const val = e.target.value;
                     setNewNote({
@@ -1608,42 +1815,44 @@ export default function App() {
                     });
                   }}
                 />
+              </div>
 
-                <div className="ref-sutra-fields-grid">
-                  <div className="form-group">
-                    <label>Reference Devanāgarī</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. तस्य वाचकः प्रणवः" 
-                      value={newNote.ref_sutra_devanagari}
-                      onChange={(e) => setNewNote({ ...newNote, ref_sutra_devanagari: e.target.value })}
-                      className="devanagari-font"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Reference IAST</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. tasya vācakaḥ praṇavaḥ" 
-                      value={newNote.ref_sutra_transliteration}
-                      onChange={(e) => setNewNote({ ...newNote, ref_sutra_transliteration: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group full-width">
-                    <label>Reference Translation</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. His word is Om." 
-                      value={newNote.ref_sutra_translation}
-                      onChange={(e) => setNewNote({ ...newNote, ref_sutra_translation: e.target.value })}
-                    />
-                  </div>
-                </div>
+              <div className="form-group">
+                <label>Reference Devanāgarī Script *</label>
+                <textarea 
+                  rows={3} required
+                  placeholder="तस्य वाचकः प्रणवः" 
+                  value={newNote.ref_sutra_devanagari}
+                  onChange={(e) => setNewNote({ ...newNote, ref_sutra_devanagari: e.target.value })}
+                  className="devanagari-font"
+                  style={{ fontSize: '18px' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Reference IAST Transliteration</label>
+                <textarea 
+                  rows={3}
+                  placeholder="tasya vācakaḥ praṇavaḥ" 
+                  value={newNote.ref_sutra_transliteration}
+                  onChange={(e) => setNewNote({ ...newNote, ref_sutra_transliteration: e.target.value })}
+                  style={{ fontFamily: 'monospace' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Reference English Translation</label>
+                <textarea 
+                  rows={3}
+                  placeholder="His designated word is Om." 
+                  value={newNote.ref_sutra_translation}
+                  onChange={(e) => setNewNote({ ...newNote, ref_sutra_translation: e.target.value })}
+                />
               </div>
 
               <div className="form-actions">
-                <button type="button" className="btn-sec" onClick={() => setShowNoteModal(false)}>Cancel</button>
-                <button type="submit" className="btn-pri">Save Note</button>
+                <button type="button" className="btn-sec" onClick={() => setShowRefSutraModal(false)}>Cancel</button>
+                <button type="submit" className="btn-pri">Save Reference Sūtra</button>
               </div>
             </form>
           </div>

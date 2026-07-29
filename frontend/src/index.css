@@ -1055,3 +1055,18 @@ button {
   grid-column: span 2;
 }
 
+/* Sidebar Sutras Nested Styling */
+.sidebar-sutra-link {
+  transition: all 0.2s ease;
+}
+
+.sidebar-sutra-link:hover {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+.sidebar-sutra-link.active {
+  background-color: var(--bg-secondary) !important;
+  border-left: 2px solid var(--accent-gold) !important;
+}
+

@@ -57,14 +57,10 @@ Use `iastToHk(iast: string): string` to convert diacritic-rich academic IAST bac
 
 ---
 
-## 📝 Notion-Style Notes with BlockNote
-- Notes are authored and rendered using **BlockNote v0.11.2** in `App.tsx`.
-- **Custom React Block (`sutraBox`):** Allows inline insertion of structured scripture cards containing:
-  - *Book Name*
-  - *Item Label* (e.g. Verse) & *Number*
-  - *Devanāgarī Text*
-  - *Translation / Details*
-- **Backward Compatibility:** Notes are saved as JSON strings. If JSON parsing fails on load, it is wrapped automatically in a paragraph block to preserve legacy plain text notes.
+## 📝 Personal Notes & Commentaries
+- Notes are authored and rendered using clean plain text format.
+- **Cross-Reference / Sub-Sutra Option:** Within the note creation modal, users can optionally attach a structured cross-reference / sub-sūtra containing Devanāgarī, transliteration, and translation.
+- **Backward Compatibility:** Legacy notes saved as JSON strings by the older BlockNote setup are automatically parsed and displayed as plain text.
 
 ---
 
